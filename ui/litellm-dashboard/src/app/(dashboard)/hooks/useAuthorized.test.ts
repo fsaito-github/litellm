@@ -58,6 +58,7 @@ vi.mock("@/utils/returnUrlUtils", async (importOriginal) => {
     storeReturnUrl: vi.fn(),
   };
 });
+
 const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -156,7 +157,7 @@ describe("useAuthorized", () => {
       expect(clearTokenCookiesMock).toHaveBeenCalled();
     });
 
-    expect(replaceMock).toHaveBeenCalledWith("http://proxy.example/ui/login");
+    expect(replaceMock).toHaveBeenCalledWith("/ui/login");
     expect(result.current.accessToken).toBeNull();
     expect(result.current.userRole).toBe("Undefined Role");
   });
@@ -189,7 +190,7 @@ describe("useAuthorized", () => {
     const { result } = renderHook(() => useAuthorized(), { wrapper });
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith("http://proxy.example/ui/login");
+      expect(replaceMock).toHaveBeenCalledWith("/ui/login");
     });
 
     expect(result.current.accessToken).toBe("api-key-123");
@@ -213,7 +214,7 @@ describe("useAuthorized", () => {
     const { result } = renderHook(() => useAuthorized(), { wrapper });
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith("http://proxy.example/ui/login");
+      expect(replaceMock).toHaveBeenCalledWith("/ui/login");
     });
 
     expect(clearTokenCookiesMock).not.toHaveBeenCalled();
@@ -248,7 +249,7 @@ describe("useAuthorized", () => {
       expect(clearTokenCookiesMock).toHaveBeenCalled();
     });
 
-    expect(replaceMock).toHaveBeenCalledWith("http://proxy.example/ui/login");
+    expect(replaceMock).toHaveBeenCalledWith("/ui/login");
     expect(checkTokenValidityMock).toHaveBeenCalledWith(token);
   });
 });

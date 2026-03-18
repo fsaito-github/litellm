@@ -12,6 +12,7 @@ import React, { useEffect, useState } from "react";
 import { BlogDropdown } from "./Navbar/BlogDropdown/BlogDropdown";
 import { CommunityEngagementButtons } from "./Navbar/CommunityEngagementButtons/CommunityEngagementButtons";
 import UserDropdown from "./Navbar/UserDropdown/UserDropdown";
+import WorkerDropdown from "./Navbar/WorkerDropdown/WorkerDropdown";
 
 interface NavbarProps {
   userID: string | null;
@@ -169,6 +170,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 NEW
               </span>
             </a>
+            <WorkerDropdown onLogout={handleLogout} />
             <CommunityEngagementButtons />
             {/* Dark mode is currently a work in progress. To test, you can change 'false' to 'true' below.
             Do not set this to true by default until all components are confirmed to support dark mode styles. */}

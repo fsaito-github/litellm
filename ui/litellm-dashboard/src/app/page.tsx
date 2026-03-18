@@ -236,7 +236,7 @@ function CreateKeyPageContent() {
       // Store the current URL so we can redirect back after login
       storeReturnUrl();
       // Build login URL with return URL parameter
-      const baseLoginUrl = (proxyBaseUrl || "") + "/ui/login";
+      const baseLoginUrl = "/ui/login";
       const dest = buildLoginUrlWithReturn(baseLoginUrl);
       // Replace instead of assigning to avoid back-button loops
       window.location.replace(dest);

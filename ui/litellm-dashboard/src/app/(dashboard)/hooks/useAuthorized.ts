@@ -1,6 +1,5 @@
 "use client";
 
-import { getProxyBaseUrl } from "@/components/networking";
 import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
 import { checkTokenValidity, decodeToken } from "@/utils/jwtUtils";
 import { buildLoginUrlWithReturn, storeReturnUrl } from "@/utils/returnUrlUtils";
@@ -23,7 +22,7 @@ const useAuthorized = () => {
   // Helper function to redirect to login while preserving the current URL
   const redirectToLogin = useCallback(() => {
     storeReturnUrl();
-    const baseLoginUrl = `${getProxyBaseUrl()}/ui/login`;
+    const baseLoginUrl = "/ui/login";
     const loginUrlWithReturn = buildLoginUrlWithReturn(baseLoginUrl);
     router.replace(loginUrlWithReturn);
   }, [router]);

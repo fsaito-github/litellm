@@ -97,7 +97,7 @@ const ModelHubTable: React.FC<ModelHubTableProps> = ({ accessToken, publicPage, 
 
       // If token is invalid, redirect to login
       if (!isTokenValid) {
-        router.replace(`${getProxyBaseUrl()}/ui/login`);
+        router.replace("/ui/login");
         return;
       }
     }

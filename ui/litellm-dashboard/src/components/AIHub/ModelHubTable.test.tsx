@@ -72,6 +72,8 @@ describe("ModelHubTable", () => {
       auto_redirect_to_sso: false,
       admin_ui_disabled: false,
       sso_configured: false,
+      is_control_plane: false,
+      workers: [],
     });
     vi.mocked(networking.modelHubPublicModelsCall).mockResolvedValue([]);
     vi.mocked(networking.getUiSettings).mockResolvedValue({
@@ -98,7 +100,7 @@ describe("ModelHubTable", () => {
 
       await waitFor(() => {
         if (shouldRedirect) {
-          expect(mockRouterReplace).toHaveBeenCalledWith("http://localhost:4000/ui/login");
+          expect(mockRouterReplace).toHaveBeenCalledWith("/ui/login");
         } else {
           expect(mockRouterReplace).not.toHaveBeenCalled();
         }
@@ -142,6 +144,8 @@ describe("ModelHubTable", () => {
       auto_redirect_to_sso: false,
       admin_ui_disabled: false,
       sso_configured: false,
+      is_control_plane: false,
+      workers: [],
     });
     modelHubPublicModelsCallMock.mockResolvedValue([]);
     vi.mocked(networking.getUiSettings).mockResolvedValue({
