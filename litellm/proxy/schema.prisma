@@ -1201,3 +1201,38 @@ model LiteLLM_ClaudeCodePluginTable {
 
   @@map("LiteLLM_ClaudeCodePluginTable")
 }
+
+// Audit log table for tracking user and system actions
+model LiteLLM_AuditLogTable {
+  id            String   @id @default(uuid())
+  timestamp     DateTime @default(now())
+  action        String   // e.g., "key.create", "team.update", "budget.change", "guardrail.violation"
+  actor_id      String   // user who performed the action
+  actor_type    String   // e.g., "user", "api_key", "system"
+  resource_type String   // e.g., "key", "team", "org", "model", "budget"
+  resource_id   String?  // ID of the affected resource
+  details       Json?    // JSON with action-specific details
+  ip_address    String?
+  user_agent    String?
+  status        String   @default("success") // success/failure/blocked
+
+  @@index([actor_id])
+  @@index([action])
+  @@index([timestamp])
+  @@index([resource_type])
+}
+
+// Session table for session management
+model LiteLLM_SessionTable {
+  session_id     String   @id @default(uuid())
+  user_id        String
+  created_at     DateTime @default(now())
+  expires_at     DateTime
+  last_active_at DateTime @default(now())
+  ip_address     String?
+  user_agent     String?
+  is_active      Boolean  @default(true)
+
+  @@index([user_id])
+  @@index([is_active])
+}

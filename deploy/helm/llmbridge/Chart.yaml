@@ -1,0 +1,18 @@
+apiVersion: v2
+name: llmbridge
+description: A Helm chart for LLM Bridge powered by LiteLLM proxy
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - llm
+  - litellm
+  - proxy
+  - ai
+maintainers:
+  - name: llmbridge-team
+dependencies:
+  - name: postgresql
+    version: "16.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

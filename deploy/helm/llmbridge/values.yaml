@@ -1,0 +1,165 @@
+replicaCount: 2
+
+image:
+  repository: docker.litellm.ai/berriai/litellm
+  tag: main-stable
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 4000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: llmbridge.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: llmbridge-tls
+  #    hosts:
+  #      - llmbridge.local
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# -- LiteLLM environment variables
+env:
+  STORE_MODEL_IN_DB: "True"
+
+# -- Additional environment variables from secrets or configmaps
+envFrom: []
+# - secretRef:
+#     name: llmbridge-secrets
+
+# -- LiteLLM master key (use existingSecret in production)
+masterKey: ""
+existingMasterKeySecret: ""
+existingMasterKeySecretKey: "LITELLM_MASTER_KEY"
+
+# -- PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    username: llmproxy
+    password: ""
+    database: litellm
+    existingSecret: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# -- DATABASE_URL override (when using external database)
+externalDatabase:
+  enabled: false
+  url: ""
+  existingSecret: ""
+  existingSecretKey: "DATABASE_URL"
+
+# -- Redis configuration
+redis:
+  enabled: false
+  host: ""
+  port: 6379
+  password: ""
+  existingSecret: ""
+  existingSecretKey: "REDIS_PASSWORD"
+
+# -- LiteLLM proxy config.yaml content
+config:
+  litellm_settings:
+    drop_params: true
+    set_verbose: false
+    cache: false
+  model_list: []
+  # - model_name: gpt-4
+  #   litellm_params:
+  #     model: azure/gpt-4
+  #     api_base: https://my-endpoint.openai.azure.com/
+  #     api_key: os.environ/AZURE_API_KEY
+
+# -- Monitoring
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      labels: {}
+
+# -- Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# -- Startup probe for slow-starting containers
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /health/liveliness
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 30
+
+livenessProbe:
+  httpGet:
+    path: /health/liveliness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/readiness
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# -- Extra volumes and volume mounts
+extraVolumes: []
+extraVolumeMounts: []
