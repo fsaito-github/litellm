@@ -1,0 +1,81 @@
+# =============================================================================
+# Production Dockerfile for LiteLLM Proxy with Gunicorn
+# =============================================================================
+#
+# Multi-worker deployment using Gunicorn + Uvicorn workers for production
+# workloads. Runs as a non-root user with health checks built in.
+#
+# Build:
+#   docker build -f deploy/Dockerfile.production -t litellm-production .
+#
+# Run:
+#   docker run -p 4000:4000 \
+#     -e GUNICORN_WORKERS=4 \
+#     -e LITELLM_MASTER_KEY=sk-... \
+#     -v /path/to/config.yaml:/app/config.yaml \
+#     litellm-production
+#
+# Environment variables:
+#   PORT                  - Listening port (default: 4000)
+#   GUNICORN_WORKERS      - Number of worker processes (default: 2*CPU+1)
+#   GUNICORN_TIMEOUT      - Worker timeout in seconds (default: 120)
+#   GUNICORN_MAX_REQUESTS - Requests before worker recycling (default: 1000)
+#   GUNICORN_LOG_LEVEL    - Log verbosity: debug|info|warning|error (default: info)
+#   LITELLM_CONFIG_PATH   - Path to LiteLLM config file (default: /app/config.yaml)
+# =============================================================================
+
+FROM python:3.11-slim AS production
+
+# -- Metadata ----------------------------------------------------------------
+LABEL maintainer="llmbridge"
+LABEL description="LiteLLM Proxy - Production multi-worker deployment"
+
+# -- System dependencies -----------------------------------------------------
+# curl is needed for the HEALTHCHECK directive
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# -- Python dependencies -----------------------------------------------------
+# Install LiteLLM and Gunicorn with Uvicorn workers.
+# Pin major versions for reproducibility; update as needed.
+RUN pip install --no-cache-dir \
+    "litellm[proxy]" \
+    gunicorn \
+    uvicorn[standard]
+
+# -- Application setup -------------------------------------------------------
+WORKDIR /app
+
+# Copy the Gunicorn configuration file
+COPY deploy/gunicorn_config.py /app/gunicorn_config.py
+
+# -- Security: non-root user -------------------------------------------------
+# Create a dedicated user/group so the process never runs as root.
+# UID/GID 1000 is the conventional choice for the primary non-root user.
+RUN groupadd --gid 1000 litellm && \
+    useradd --uid 1000 --gid litellm --shell /bin/bash --create-home litellm && \
+    chown -R litellm:litellm /app
+
+USER litellm
+
+# -- Networking ---------------------------------------------------------------
+# Default port; overridable via PORT env var in gunicorn_config.py
+EXPOSE 4000
+
+# -- Health check -------------------------------------------------------------
+# Verifies the proxy is responsive. The /health/liveliness endpoint is
+# LiteLLM's built-in liveness check. Kubernetes probes can override this,
+# but this provides a baseline for standalone Docker deployments.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-4000}/health/liveliness || exit 1
+
+# -- Entrypoint ---------------------------------------------------------------
+# Start Gunicorn with the production config, pointing at LiteLLM's ASGI app.
+# The LITELLM_CONFIG_PATH env var tells LiteLLM where to find its config.yaml;
+# mount your config file to this path at runtime.
+ENV LITELLM_CONFIG_PATH=/app/config.yaml
+
+CMD ["gunicorn", \
+     "--config", "/app/gunicorn_config.py", \
+     "litellm.proxy.proxy_server:app"]

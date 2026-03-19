@@ -87,6 +87,14 @@ spec:
                   key: {{ .Values.redis.existingSecretKey }}
             {{- end }}
             {{- end }}
+            {{- if .Values.gunicorn.enabled }}
+            - name: GUNICORN_WORKERS
+              value: {{ .Values.gunicorn.workers | quote }}
+            - name: GUNICORN_TIMEOUT
+              value: {{ .Values.gunicorn.timeout | quote }}
+            - name: GUNICORN_MAX_REQUESTS
+              value: {{ .Values.gunicorn.maxRequests | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

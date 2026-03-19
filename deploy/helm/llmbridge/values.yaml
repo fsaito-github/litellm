@@ -160,6 +160,24 @@ readinessProbe:
   timeoutSeconds: 5
   failureThreshold: 3
 
+# -- Gunicorn multi-worker configuration
+# When enabled, the container runs LiteLLM behind Gunicorn with multiple
+# Uvicorn workers for production-grade concurrency and reliability.
+# Requires using the production Docker image (deploy/Dockerfile.production).
+gunicorn:
+  # Set to true to inject Gunicorn env vars into the pod.
+  # The production image reads these to configure worker count, timeouts, etc.
+  enabled: true
+  # Number of Gunicorn worker processes. Each worker runs an independent
+  # Uvicorn event loop. Rule of thumb: 2-4 workers per CPU core.
+  workers: 4
+  # Maximum seconds a worker can spend on a single request before being
+  # killed and restarted. Set high enough for long-running LLM completions.
+  timeout: 120
+  # Workers are recycled after serving this many requests to prevent
+  # gradual memory leaks from accumulating.
+  maxRequests: 1000
+
 # -- Extra volumes and volume mounts
 extraVolumes: []
 extraVolumeMounts: []

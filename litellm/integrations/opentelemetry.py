@@ -60,6 +60,10 @@ LITELLM_REQUEST_SPAN_NAME = "litellm_request"
 
 @dataclass
 class OpenTelemetryConfig:
+    # Supported exporter values: "console", "otlp_http", "otlp_grpc", "azure_monitor",
+    # or a SpanExporter instance.
+    # Azure Monitor: set exporter="azure_monitor" and either
+    # APPLICATIONINSIGHTS_CONNECTION_STRING env var or endpoint in config
     exporter: Union[str, SpanExporter] = "console"
     endpoint: Optional[str] = None
     headers: Optional[str] = None
@@ -2072,6 +2076,29 @@ class OpenTelemetry(CustomLogger):
             return BatchSpanProcessor(
                 OTLPSpanExporterGRPC(
                     endpoint=normalized_endpoint, headers=_split_otel_headers
+                ),
+            )
+        elif self.OTEL_EXPORTER == "azure_monitor":
+            try:
+                from azure.monitor.opentelemetry.exporter import (
+                    AzureMonitorTraceExporter,
+                )
+            except ImportError as exc:
+                raise ImportError(
+                    "Azure Monitor exporter is not available. Install "
+                    "`azure-monitor-opentelemetry-exporter` to enable Azure Monitor."
+                ) from exc
+
+            verbose_logger.debug(
+                "OpenTelemetry: initializing Azure Monitor exporter. Value of OTEL_EXPORTER: %s",
+                self.OTEL_EXPORTER,
+            )
+            connection_string = os.getenv(
+                "APPLICATIONINSIGHTS_CONNECTION_STRING"
+            ) or self.OTEL_ENDPOINT
+            return BatchSpanProcessor(
+                AzureMonitorTraceExporter(
+                    connection_string=connection_string,
                 ),
             )
         else:
