@@ -370,6 +370,9 @@ from litellm.proxy.management_endpoints.cost_tracking_settings import (
 from litellm.proxy.management_endpoints.customer_endpoints import (
     router as customer_router,
 )
+from litellm.proxy.management_endpoints.finops_endpoints import (
+    router as finops_router,
+)
 from litellm.proxy.management_endpoints.fallback_management_endpoints import (
     router as fallback_management_router,
 )
@@ -13288,6 +13291,7 @@ app.include_router(organization_router)
 app.include_router(project_router)
 app.include_router(customer_router)
 app.include_router(spend_management_router)
+app.include_router(finops_router)
 app.include_router(cloudzero_router)
 app.include_router(vantage_router)
 app.include_router(caching_router)
