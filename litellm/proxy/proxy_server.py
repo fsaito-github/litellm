@@ -390,6 +390,9 @@ from litellm.proxy.management_endpoints.key_management_endpoints import (
 from litellm.proxy.management_endpoints.key_management_endpoints import (
     router as key_management_router,
 )
+from litellm.proxy.management_endpoints.audit_endpoints import (
+    router as audit_router,
+)
 from litellm.proxy.management_endpoints.mcp_management_endpoints import (
     router as mcp_management_router,
 )
@@ -13319,6 +13322,7 @@ app.include_router(agent_endpoints_router)
 app.include_router(compliance_router)
 app.include_router(a2a_router)
 app.include_router(access_group_router)
+app.include_router(audit_router)
 ########################################################
 # MCP Server
 ########################################################
