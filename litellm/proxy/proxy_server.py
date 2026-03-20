@@ -399,6 +399,9 @@ from litellm.proxy.management_endpoints.key_management_endpoints import (
 from litellm.proxy.management_endpoints.audit_endpoints import (
     router as audit_router,
 )
+from litellm.proxy.management_endpoints.mcp_gateway_endpoints import (
+    router as mcp_gateway_router,
+)
 from litellm.proxy.management_endpoints.mcp_management_endpoints import (
     router as mcp_management_router,
 )
@@ -437,6 +440,9 @@ from litellm.proxy.management_endpoints.team_endpoints import (
 )
 from litellm.proxy.management_endpoints.prompt_management_endpoints import (
     router as prompt_management_router,
+)
+from litellm.proxy.management_endpoints.agent_gateway_endpoints import (
+    router as agent_gateway_router,
 )
 from litellm.proxy.management_endpoints.tool_management_endpoints import (
     router as tool_management_router,
@@ -13278,6 +13284,7 @@ app.include_router(credential_router)
 app.include_router(llm_passthrough_router)
 app.include_router(webrtc_router)
 app.include_router(mcp_management_router)
+app.include_router(mcp_gateway_router)
 app.include_router(mcp_byok_oauth_router)
 app.include_router(anthropic_router)
 app.include_router(anthropic_skills_router)
@@ -13335,6 +13342,7 @@ app.include_router(a2a_router)
 app.include_router(access_group_router)
 app.include_router(audit_router)
 app.include_router(prompt_management_router)
+app.include_router(agent_gateway_router)
 ########################################################
 # MCP Server
 ########################################################
