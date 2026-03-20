@@ -1235,6 +1235,7 @@ model LiteLLM_SessionTable {
 
   @@index([user_id])
   @@index([is_active])
+  @@index([expires_at, is_active])
 }
 
 // Prompt management tables

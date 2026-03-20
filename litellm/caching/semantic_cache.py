@@ -622,31 +622,41 @@ class SemanticCache(BaseCache):
 
     async def _evict_oldest(self, count: int) -> None:
         """
-        Remove the *count* oldest entries from the cache based on stored timestamp.
+        Remove the *count* oldest entries from the cache.
+
+        Uses sampling to avoid loading ALL entries into memory when the
+        cache is large.
         """
+        import random
+
         try:
-            entry_keys = await self.redis_client.smembers(self.INDEX_KEY)
-            if not entry_keys:
+            entry_keys = list(await self.redis_client.smembers(self.INDEX_KEY))
+            if not entry_keys or count <= 0:
                 return
 
+            # Sample a subset to find oldest (avoid loading ALL entries)
+            sample_size = min(len(entry_keys), count * 3)
+            sample_keys = (
+                random.sample(entry_keys, sample_size)
+                if len(entry_keys) > sample_size
+                else entry_keys
+            )
+
+            # Get values only for sampled entries
             pipe = self.redis_client.pipeline(transaction=False)
-            key_list = list(entry_keys)
-            for k in key_list:
+            for k in sample_keys:
                 pipe.get(k)
             raw_values = await pipe.execute()
 
             entries_with_ts: List[Tuple[str, float]] = []
-            for key, raw in zip(key_list, raw_values):
+            for key, raw in zip(sample_keys, raw_values):
                 if raw is None:
-                    # Key expired in Redis but still in the index set — clean it up
-                    await self.redis_client.srem(self.INDEX_KEY, key)
                     continue
                 try:
                     entry = json.loads(raw)
-                    ts = entry.get("timestamp", 0.0)
-                    entries_with_ts.append((key, ts))
+                    entries_with_ts.append((key, entry.get("timestamp", 0.0)))
                 except (json.JSONDecodeError, TypeError):
-                    await self.redis_client.srem(self.INDEX_KEY, key)
+                    entries_with_ts.append((key, 0.0))  # Remove corrupt entries
 
             # Sort ascending by timestamp (oldest first)
             entries_with_ts.sort(key=lambda x: x[1])

@@ -13,7 +13,7 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from litellm._logging import verbose_proxy_logger
@@ -65,8 +65,6 @@ async def get_audit_logs(
     from litellm.proxy.proxy_server import prisma_client
 
     if prisma_client is None:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database not connected. Connect a database to your proxy.",
@@ -87,13 +85,25 @@ async def get_audit_logs(
     if start_date is not None or end_date is not None:
         timestamp_filter: dict = {}
         if start_date is not None:
-            timestamp_filter["gte"] = datetime.fromisoformat(
-                start_date.replace("Z", "+00:00")
-            )
+            try:
+                timestamp_filter["gte"] = datetime.fromisoformat(
+                    start_date.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid start_date format: {start_date}. Use ISO 8601.",
+                )
         if end_date is not None:
-            timestamp_filter["lte"] = datetime.fromisoformat(
-                end_date.replace("Z", "+00:00")
-            )
+            try:
+                timestamp_filter["lte"] = datetime.fromisoformat(
+                    end_date.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid end_date format: {end_date}. Use ISO 8601.",
+                )
         where_conditions["timestamp"] = timestamp_filter
 
     logs = await prisma_client.db.litellm_auditlogtable.find_many(
@@ -166,8 +176,6 @@ async def export_audit_logs(
     from litellm.proxy.proxy_server import prisma_client
 
     if prisma_client is None:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database not connected. Connect a database to your proxy.",
@@ -187,13 +195,25 @@ async def export_audit_logs(
     if start_date is not None or end_date is not None:
         timestamp_filter: dict = {}
         if start_date is not None:
-            timestamp_filter["gte"] = datetime.fromisoformat(
-                start_date.replace("Z", "+00:00")
-            )
+            try:
+                timestamp_filter["gte"] = datetime.fromisoformat(
+                    start_date.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid start_date format: {start_date}. Use ISO 8601.",
+                )
         if end_date is not None:
-            timestamp_filter["lte"] = datetime.fromisoformat(
-                end_date.replace("Z", "+00:00")
-            )
+            try:
+                timestamp_filter["lte"] = datetime.fromisoformat(
+                    end_date.replace("Z", "+00:00")
+                )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid end_date format: {end_date}. Use ISO 8601.",
+                )
         where_conditions["timestamp"] = timestamp_filter
 
     logs = await prisma_client.db.litellm_auditlogtable.find_many(

@@ -57,6 +57,42 @@ _PII_PATTERNS: Dict[str, re.Pattern] = {
     ),
 }
 
+
+
+def _validate_cpf(digits: str) -> bool:
+    """Validate CPF using modulo 11 algorithm."""
+    if len(digits) != 11 or digits == digits[0] * 11:
+        return False
+    # First check digit
+    total = sum(int(digits[i]) * (10 - i) for i in range(9))
+    d1 = 11 - (total % 11)
+    d1 = 0 if d1 >= 10 else d1
+    if int(digits[9]) != d1:
+        return False
+    # Second check digit
+    total = sum(int(digits[i]) * (11 - i) for i in range(10))
+    d2 = 11 - (total % 11)
+    d2 = 0 if d2 >= 10 else d2
+    return int(digits[10]) == d2
+
+
+def _validate_cnpj(digits: str) -> bool:
+    """Validate CNPJ using modulo 11 algorithm."""
+    if len(digits) != 14 or digits == digits[0] * 14:
+        return False
+    weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    total = sum(int(digits[i]) * weights1[i] for i in range(12))
+    d1 = 11 - (total % 11)
+    d1 = 0 if d1 >= 10 else d1
+    if int(digits[12]) != d1:
+        return False
+    weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    total = sum(int(digits[i]) * weights2[i] for i in range(13))
+    d2 = 11 - (total % 11)
+    d2 = 0 if d2 >= 10 else d2
+    return int(digits[13]) == d2
+
+
 _MASK_FORMATS: Dict[str, str] = {
     "cpf": "[CPF:***.***.***-**]",
     "cnpj": "[CNPJ:MASKED]",
@@ -194,6 +230,17 @@ class PIIMaskingHook(CustomLogger):
                 # Skip if the match was already replaced in a previous pass
                 if original not in masked:
                     continue
+
+                # Validate raw-digit CPF/CNPJ to avoid false positives
+                if pii_type == "cpf":
+                    digits_only = re.sub(r'\D', '', original)
+                    if len(digits_only) == 11 and '.' not in original and not _validate_cpf(digits_only):
+                        continue
+                elif pii_type == "cnpj":
+                    digits_only = re.sub(r'\D', '', original)
+                    if len(digits_only) == 14 and '/' not in original and not _validate_cnpj(digits_only):
+                        continue
+
                 detections.append(
                     {
                         "type": pii_type,
