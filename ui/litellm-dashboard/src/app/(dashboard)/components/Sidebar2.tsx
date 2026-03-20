@@ -13,8 +13,11 @@ import {
   ApiOutlined,
   AppstoreOutlined,
   DatabaseOutlined,
+  DollarOutlined,
+  FileSearchOutlined,
   FileTextOutlined,
   LineChartOutlined,
+  SafetyCertificateOutlined,
   SafetyOutlined,
   ExperimentOutlined,
   ToolOutlined,
@@ -142,6 +145,14 @@ const routeFor = (slug: string): string => {
       return "settings/admin-settings";
     case "ui-theme":
       return "settings/ui-theme";
+
+    // llmbridge
+    case "finops":
+      return "llmbridge/finops";
+    case "audit-logs":
+      return "llmbridge/audit-logs";
+    case "compliance":
+      return "llmbridge/compliance";
 
     default:
       // treat as already a relative path
@@ -282,6 +293,36 @@ const menuItems: MenuItemCfg[] = [
         roles: all_admin_roles,
       },
       { key: "4", page: "usage", label: "Old Usage", icon: <BarChartOutlined style={{ fontSize: 18 }} /> },
+    ],
+  },
+  {
+    key: "llmbridge",
+    page: "llmbridge",
+    label: "LLM Bridge",
+    icon: <BarChartOutlined style={{ fontSize: 18 }} />,
+    roles: all_admin_roles,
+    children: [
+      {
+        key: "finops",
+        page: "finops",
+        label: "FinOps",
+        icon: <DollarOutlined style={{ fontSize: 18 }} />,
+        roles: all_admin_roles,
+      },
+      {
+        key: "audit-logs",
+        page: "audit-logs",
+        label: "Audit Logs",
+        icon: <FileSearchOutlined style={{ fontSize: 18 }} />,
+        roles: all_admin_roles,
+      },
+      {
+        key: "compliance",
+        page: "compliance",
+        label: "Compliance",
+        icon: <SafetyCertificateOutlined style={{ fontSize: 18 }} />,
+        roles: all_admin_roles,
+      },
     ],
   },
   {

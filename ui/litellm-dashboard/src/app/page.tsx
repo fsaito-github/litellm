@@ -40,6 +40,9 @@ import { AccessGroupsPage } from "@/components/AccessGroups/AccessGroupsPage";
 import { ProjectsPage } from "@/components/Projects/ProjectsPage";
 import VectorStoreManagement from "@/components/vector_store_management";
 import ToolPoliciesView from "@/components/ToolPoliciesView";
+import AgentGatewayDashboard from "@/components/llmbridge/AgentGatewayDashboard";
+import ContentFirewallDashboard from "@/components/llmbridge/ContentFirewallDashboard";
+import PromptManagementDashboard from "@/components/llmbridge/PromptManagementDashboard";
 import SpendLogsTable from "@/components/view_logs";
 import ViewUserDashboard from "@/components/view_users";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -617,6 +620,12 @@ function CreateKeyPageContent() {
                     <ToolPoliciesView accessToken={accessToken} userRole={userRole} />
                   ) : page == "guardrails-monitor" ? (
                     <GuardrailsMonitorView accessToken={accessToken} />
+                  ) : page == "agent-gateway" ? (
+                    <AgentGatewayDashboard accessToken={accessToken} userRole={userRole} />
+                  ) : page == "content-firewall" ? (
+                    <ContentFirewallDashboard accessToken={accessToken} userRole={userRole} />
+                  ) : page == "prompt-mgmt" ? (
+                    <PromptManagementDashboard accessToken={accessToken} userRole={userRole} />
                   ) : page == "new_usage" ? (
                     <NewUsagePage
                       teams={(teams as Team[]) ?? []}
