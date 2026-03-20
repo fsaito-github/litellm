@@ -459,6 +459,7 @@ from litellm.proxy.management_helpers.audit_logs import create_audit_log_for_upd
 from litellm.proxy.middleware.in_flight_requests_middleware import (
     InFlightRequestsMiddleware,
 )
+from litellm.proxy.middleware.llmbridge_middleware import initialize_llmbridge
 from litellm.proxy.middleware.prometheus_auth_middleware import PrometheusAuthMiddleware
 from litellm.proxy.ocr_endpoints.endpoints import router as ocr_router
 from litellm.proxy.openai_evals_endpoints.endpoints import router as evals_router
@@ -970,6 +971,13 @@ async def proxy_startup_event(app: FastAPI):  # noqa: PLR0915
 
     ## Initialize shared aiohttp session for connection reuse
     shared_aiohttp_session = await _initialize_shared_aiohttp_session()
+
+    ## [Optional] Initialize LLM Bridge middleware (env: LLMBRIDGE_ENABLED=true)
+    if os.environ.get("LLMBRIDGE_ENABLED", "").strip().lower() in ("1", "true", "yes"):
+        try:
+            initialize_llmbridge()
+        except Exception as e:
+            verbose_proxy_logger.error("LLM Bridge initialization failed: %s", e)
 
     # End of startup event
     yield
