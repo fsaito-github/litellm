@@ -329,12 +329,6 @@ const menuGroups: MenuGroup[] = [
         icon: <FileTextOutlined />,
         roles: all_admin_roles,
       },
-    ],
-  },
-  {
-    groupLabel: "LLM BRIDGE",
-    roles: all_admin_roles,
-    items: [
       {
         key: "finops",
         page: "finops",
