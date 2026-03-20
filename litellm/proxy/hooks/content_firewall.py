@@ -77,7 +77,7 @@ _DEFAULT_RULES: List[FirewallRule] = [
         name="Ignore Previous Instructions",
         description="Detects attempts to override prior instructions.",
         category="prompt_injection",
-        pattern=r"(?i)\b(ignore|disregard|forget|skip|bypass)\b.{0,30}\b(previous|prior|above|earlier|all)\b.{0,30}\b(instructions?|prompts?|rules?|directives?)\b",
+        pattern=r"(?i)\b(ignore|disregard|forget|skip|bypass)\b[^\n]{0,30}\b(previous|prior|above|earlier|all)\b[^\n]{0,30}\b(instructions?|prompts?|rules?|directives?)\b",
         action="block",
         severity="high",
     ),
@@ -114,7 +114,7 @@ _DEFAULT_RULES: List[FirewallRule] = [
         name="Bypass Safety",
         description="Detects requests to disable or bypass safety filters.",
         category="jailbreak",
-        pattern=r"(?i)\b(bypass|disable|turn\s+off|remove|ignore)\b.{0,30}\b(safety|content\s+filter|guardrail|moderation|restriction|censorship)\b",
+        pattern=r"(?i)\b(bypass|disable|turn\s+off|remove|ignore)\b[^\n]{0,30}\b(safety|content\s+filter|guardrail|moderation|restriction|censorship)\b",
         action="block",
         severity="critical",
     ),
@@ -307,13 +307,31 @@ class ContentFirewall:
 
     # -- public API ---------------------------------------------------------
 
+    _MAX_TEXT_LENGTH = 50000
+
     def check(self, text: str, message_index: int = 0) -> List[FirewallViolation]:
         """Run all enabled rules against *text* and return violations."""
         self._total_checks += 1
         violations: List[FirewallViolation] = []
 
+        if len(text) > self._MAX_TEXT_LENGTH:
+            verbose_proxy_logger.warning(
+                "content_firewall: skipping regex checks — input length %d exceeds %d char limit",
+                len(text),
+                self._MAX_TEXT_LENGTH,
+            )
+            return violations
+
         for rule in self._rules.values():
-            matched = self._match_rule(rule, text)
+            try:
+                matched = self._match_rule(rule, text)
+            except re.error as exc:
+                verbose_proxy_logger.warning(
+                    "content_firewall: regex error in rule %s — %s",
+                    rule.rule_id,
+                    exc,
+                )
+                continue
             if matched is not None:
                 truncated = matched[:100]
                 violation = FirewallViolation(

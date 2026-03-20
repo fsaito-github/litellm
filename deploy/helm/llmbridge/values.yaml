@@ -81,7 +81,11 @@ postgresql:
   enabled: true
   auth:
     username: llmproxy
-    password: ""
+    # WARNING: For production, use existingSecret instead of password
+    # existingSecret: "my-postgresql-secret"
+    # secretKeys:
+    #   adminPasswordKey: "password"
+    password: ""  # CHANGE THIS - only for development
     database: litellm
     existingSecret: ""
   primary:

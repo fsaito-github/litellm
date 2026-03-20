@@ -157,9 +157,13 @@ class FinOpsCopilot:
         with self._lock:
             self._entity_budgets[entity_id] = budget
 
+    _MAX_SPEND_HISTORY = 2700  # ~90 days at 30 snapshots/day
+
     def record_spend_snapshot(self, snapshot: _SpendSnapshot) -> None:
         with self._lock:
             self._spend_history.append(snapshot)
+            if len(self._spend_history) > self._MAX_SPEND_HISTORY:
+                self._spend_history = self._spend_history[-self._MAX_SPEND_HISTORY:]
 
     # -- analysis -----------------------------------------------------------
 

@@ -80,28 +80,31 @@ def fire_and_forget_audit_event(
     user_agent: Optional[str] = None,
     status: str = "success",
 ) -> None:
-    """
-    Schedule an audit log write without awaiting it.
-
-    Safe to call from sync or async contexts where you don't want to block.
-    """
+    """Schedule an audit event write without blocking the caller."""
+    kwargs = dict(
+        action=action,
+        actor_id=actor_id,
+        actor_type=actor_type,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        details=details,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        status=status,
+    )
     try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(
-            log_audit_event(
-                action=action,
-                actor_id=actor_id,
-                actor_type=actor_type,
-                resource_type=resource_type,
-                resource_id=resource_id,
-                details=details,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                status=status,
-            )
-        )
-    except Exception:
-        verbose_proxy_logger.warning(
-            "audit_log_hook: failed to schedule audit log task — %s",
-            traceback.format_exc(),
-        )
+        loop = asyncio.get_running_loop()
+        loop.create_task(log_audit_event(**kwargs))
+    except RuntimeError:
+        # No running event loop — fall back to a thread
+        import threading
+
+        def _run():
+            try:
+                _loop = asyncio.new_event_loop()
+                _loop.run_until_complete(log_audit_event(**kwargs))
+                _loop.close()
+            except Exception:
+                verbose_proxy_logger.warning("audit_log_hook: thread fallback failed")
+
+        threading.Thread(target=_run, daemon=True).start()

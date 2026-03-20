@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 import uuid
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -178,7 +178,8 @@ class ObservabilityGraphManager:
     """Manages the lifecycle of execution traces."""
 
     def __init__(self) -> None:
-        self._traces: Dict[str, ExecutionGraph] = {}
+        self._traces: OrderedDict[str, ExecutionGraph] = OrderedDict()
+        self._max_traces = 5000
         self._lock = threading.Lock()
         verbose_proxy_logger.info("ObservabilityGraphManager initialized")
 
@@ -186,6 +187,8 @@ class ObservabilityGraphManager:
         with self._lock:
             graph = ExecutionGraph(trace_id=trace_id)
             self._traces[trace_id] = graph
+            while len(self._traces) > self._max_traces:
+                self._traces.popitem(last=False)
             verbose_proxy_logger.debug(
                 "observability_graph.py::start_trace(): trace_id=%s", trace_id
             )

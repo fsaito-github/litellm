@@ -297,8 +297,10 @@ async def finops_spend_trends(
 
         # project_id is stored in metadata for spend logs in some setups
         if project_id:
+            # Escape SQL LIKE wildcards
+            project_id_escaped = project_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             conditions.append(f'"metadata"::text LIKE ${idx}')
-            params.append(f"%{project_id}%")
+            params.append(f"%{project_id_escaped}%")
             idx += 1
 
         where = " AND ".join(conditions)

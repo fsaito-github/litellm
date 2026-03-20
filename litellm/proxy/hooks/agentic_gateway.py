@@ -62,6 +62,7 @@ class AgentSession:
         self.total_tokens: int = 0
         self.total_cost: float = 0.0
         self.created_at: float = time.time()
+        self._created_at: float = time.time()
         self.updated_at: float = time.time()
 
     def add_turn(
@@ -163,10 +164,13 @@ class AgenticGateway:
     * Delegates model calls to ``litellm.acompletion()``.
     """
 
+    _MAX_SESSIONS = 10000
+
     def __init__(self) -> None:
         self._agents: Dict[str, AgentDefinition] = {}
         self._sessions: Dict[str, AgentSession] = {}
         self._router: Optional[AgentRouter] = None
+        self._config = type("_Cfg", (), {"session_ttl_minutes": 60})()
 
         # lightweight stats
         self._stats_requests: Dict[str, int] = defaultdict(int)
@@ -305,9 +309,18 @@ class AgenticGateway:
     def get_session(self, session_id: str) -> Optional[AgentSession]:
         return self._sessions.get(session_id)
 
+    def _cleanup_expired_sessions(self) -> None:
+        """Remove sessions older than TTL."""
+        now = time.time()
+        expired = [sid for sid, s in self._sessions.items()
+                   if now - s._created_at > self._config.session_ttl_minutes * 60]
+        for sid in expired:
+            del self._sessions[sid]
+
     def _get_or_create_session(
         self, session_id: str, agent_id: str
     ) -> AgentSession:
+        self._cleanup_expired_sessions()
         if session_id not in self._sessions:
             self._sessions[session_id] = AgentSession(
                 session_id=session_id, agent_id=agent_id
@@ -317,6 +330,11 @@ class AgenticGateway:
                 session_id,
                 agent_id,
             )
+        # Cap total sessions after cleanup
+        if len(self._sessions) > self._MAX_SESSIONS:
+            oldest = sorted(self._sessions, key=lambda s: self._sessions[s]._created_at)
+            for sid in oldest[:len(self._sessions) - self._MAX_SESSIONS]:
+                del self._sessions[sid]
         return self._sessions[session_id]
 
     # -- stats --------------------------------------------------------------

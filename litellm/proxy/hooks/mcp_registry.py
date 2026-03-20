@@ -19,7 +19,7 @@ Usage:
 import statistics
 import time
 import uuid
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional
@@ -84,7 +84,7 @@ class MCPRegistry:
     def __init__(self, config: Optional[MCPRegistryConfig] = None) -> None:
         self.config = config or MCPRegistryConfig()
         self._servers: Dict[str, MCPServerEntry] = {}
-        self._invocations: List[MCPToolInvocation] = []
+        self._invocations: deque[MCPToolInvocation] = deque(maxlen=10000)
         # rate-limit tracking: {(server_id, caller_id): [timestamps]}
         self._rate_counters: Dict[tuple, List[float]] = defaultdict(list)
         self._lock = Lock()

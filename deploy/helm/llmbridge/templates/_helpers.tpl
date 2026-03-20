@@ -78,6 +78,7 @@ Return the DATABASE_URL
 {{- if .Values.externalDatabase.enabled }}
 {{- .Values.externalDatabase.url }}
 {{- else if .Values.postgresql.enabled }}
+{{- /* WARNING: In production use postgresql.auth.existingSecret to avoid plaintext passwords */ -}}
 {{- printf "postgresql://%s:%s@%s:5432/%s" .Values.postgresql.auth.username .Values.postgresql.auth.password (include "llmbridge.postgresql.host" .) .Values.postgresql.auth.database }}
 {{- end }}
 {{- end }}
