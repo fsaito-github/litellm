@@ -361,6 +361,9 @@ from litellm.proxy.management_endpoints.common_utils import (
 from litellm.proxy.management_endpoints.compliance_endpoints import (
     router as compliance_router,
 )
+from litellm.proxy.management_endpoints.compliance_latam_endpoints import (
+    router as compliance_latam_router,
+)
 from litellm.proxy.management_endpoints.config_override_endpoints import (
     router as config_override_router,
 )
@@ -431,6 +434,9 @@ from litellm.proxy.management_endpoints.team_endpoints import router as team_rou
 from litellm.proxy.management_endpoints.team_endpoints import (
     update_team,
     validate_membership,
+)
+from litellm.proxy.management_endpoints.prompt_management_endpoints import (
+    router as prompt_management_router,
 )
 from litellm.proxy.management_endpoints.tool_management_endpoints import (
     router as tool_management_router,
@@ -13324,9 +13330,11 @@ app.include_router(enterprise_router)
 app.include_router(ui_discovery_endpoints_router)
 app.include_router(agent_endpoints_router)
 app.include_router(compliance_router)
+app.include_router(compliance_latam_router)
 app.include_router(a2a_router)
 app.include_router(access_group_router)
 app.include_router(audit_router)
+app.include_router(prompt_management_router)
 ########################################################
 # MCP Server
 ########################################################

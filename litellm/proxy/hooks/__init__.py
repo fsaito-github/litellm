@@ -3,6 +3,7 @@ from typing import Literal, Union
 
 from . import *
 from .cache_control_check import _PROXY_CacheControlCheck
+from .compliance_latam import DataResidencyHook, PIIMaskingHook
 from .litellm_skills import SkillsInjectionHook
 from .max_budget_limiter import _PROXY_MaxBudgetLimiter
 from .max_budget_per_session_limiter import _PROXY_MaxBudgetPerSessionHandler
@@ -27,6 +28,8 @@ PROXY_HOOKS = {
     "litellm_skills": SkillsInjectionHook,
     "max_iterations_limiter": _PROXY_MaxIterationsHandler,
     "max_budget_per_session_limiter": _PROXY_MaxBudgetPerSessionHandler,
+    "compliance_latam_pii": PIIMaskingHook,
+    "compliance_latam_residency": DataResidencyHook,
 }
 
 ## FEATURE FLAG HOOKS ##

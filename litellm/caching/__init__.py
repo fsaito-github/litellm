@@ -8,4 +8,5 @@ from .redis_cache import RedisCache
 from .redis_cluster_cache import RedisClusterCache
 from .redis_semantic_cache import RedisSemanticCache
 from .s3_cache import S3Cache
+from .semantic_cache import SemanticCache, SemanticCacheConfig
 from .gcs_cache import GCSCache

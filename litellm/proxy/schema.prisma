@@ -1236,3 +1236,40 @@ model LiteLLM_SessionTable {
   @@index([user_id])
   @@index([is_active])
 }
+
+// Prompt management tables
+model LiteLLM_PromptTable {
+  prompt_id     String   @id @default(uuid())
+  prompt_name   String   @unique
+  description   String?
+  template      String   // The prompt template with {{variables}}
+  variables     Json     @default("[]")  // List of variable names
+  version       Int      @default(1)
+  is_active     Boolean  @default(true)
+  metadata      Json     @default("{}")
+  created_at    DateTime @default(now())
+  created_by    String
+  updated_at    DateTime @default(now()) @updatedAt
+  updated_by    String
+
+  versions      LiteLLM_PromptVersionTable[]
+
+  @@index([prompt_name])
+  @@index([is_active])
+}
+
+model LiteLLM_PromptVersionTable {
+  id            String   @id @default(uuid())
+  prompt_id     String
+  version       Int
+  template      String
+  variables     Json     @default("[]")
+  change_note   String?
+  created_at    DateTime @default(now())
+  created_by    String
+
+  prompt        LiteLLM_PromptTable @relation(fields: [prompt_id], references: [prompt_id])
+
+  @@unique([prompt_id, version])
+  @@index([prompt_id])
+}
