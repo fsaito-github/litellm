@@ -1,0 +1,45 @@
+name: LLM Bridge CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install ruff
+      - run: ruff check litellm/proxy/hooks/ litellm/caching/semantic_cache.py litellm/proxy/management_endpoints/ litellm/proxy/health_endpoints/info_endpoint.py litellm/proxy/auth/oidc_handler.py litellm/proxy/auth/entra_id_handler.py litellm/proxy/auth/sso_config.py
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pytest pytest-cov pydantic httpx PyJWT cryptography
+      - run: pip install -e .
+      - run: pytest tests/llmbridge/ -v --tb=short --co -q 2>/dev/null || pytest tests/llmbridge/ -v --tb=short -x
+      - run: pytest tests/llmbridge/ --cov=litellm/proxy/hooks --cov=litellm/caching/semantic_cache --cov-report=term-missing --cov-fail-under=60
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/Dockerfile.production -t llmbridge:test .
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/llmbridge/
+      - run: helm template llmbridge deploy/helm/llmbridge/ --debug > /dev/null
