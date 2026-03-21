@@ -51,7 +51,7 @@ class TestPIIMasking:
         assert "user@example.com" not in masked
 
     def test_cpf_without_dots(self, hook):
-        text = "CPF raw: 12345678901"
+        text = "CPF raw: 12345678909"
         masked, detections = hook.mask_pii(text)
         assert "[CPF:***.***.***-**]" in masked
         assert any(d["type"] == "cpf" for d in detections)

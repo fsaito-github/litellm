@@ -18,8 +18,8 @@ class TestDefaultRules:
     def test_default_rules_loaded_count(self):
         fw = ContentFirewall()
         stats = fw.get_stats()
-        assert stats["total_rules"] == 15
-        assert stats["active_rules"] == 15
+        assert stats["total_rules"] == 25
+        assert stats["active_rules"] == 25
 
     def test_five_categories_covered(self):
         fw = ContentFirewall()
@@ -30,6 +30,7 @@ class TestDefaultRules:
             "pii_leak",
             "toxic_content",
             "data_exfiltration",
+            "custom_regex",
         }
 
 

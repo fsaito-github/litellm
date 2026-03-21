@@ -55,6 +55,26 @@ _PII_PATTERNS: Dict[str, re.Pattern] = {
     "email": re.compile(
         r"\b([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\b",
     ),
+    # PIX Keys — random PIX key uses UUID format
+    "pix_key": re.compile(
+        r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+    ),
+    # Transaction references (common Brazilian banking formats)
+    "transaction_ref": re.compile(
+        r"\b(?:TED|DOC|PIX|TEF)\s*[#:]?\s*[A-Z0-9]{6,20}\b",
+    ),
+    # Bank account full format (agency + account)
+    "bank_account_full": re.compile(
+        r"(?i)(?:ag[eê]ncia|ag)\s*[:#.]?\s*(\d{4})\s*(?:conta|cc|c/c)\s*[:#.]?\s*(\d{5,8})-?(\d)",
+    ),
+    # IBAN format
+    "iban": re.compile(
+        r"\b[A-Z]{2}\d{2}\s?[\dA-Z]{4}\s?[\dA-Z]{4}\s?[\dA-Z]{4}\s?[\dA-Z]{0,4}\b",
+    ),
+    # Monetary values with context (saldo, transferência, pagamento)
+    "monetary_value": re.compile(
+        r"(?i)(?:saldo|balance|transferi[rua]|pagamento|valor)\s*[:#]?\s*R\$\s*[\d.,]+",
+    ),
 }
 
 
@@ -100,6 +120,11 @@ _MASK_FORMATS: Dict[str, str] = {
     "bank_account": "[BANK_ACCOUNT:MASKED]",
     "credit_card": "[CREDIT_CARD:****-****-****-****]",
     "email": "[EMAIL:MASKED]",
+    "pix_key": "[PIX_KEY:MASKED]",
+    "transaction_ref": "[TRANSACTION_REF:MASKED]",
+    "bank_account_full": "[BANK_ACCOUNT:MASKED]",
+    "iban": "[IBAN:MASKED]",
+    "monetary_value": "[MONETARY:MASKED]",
 }
 
 
@@ -161,7 +186,7 @@ class ComplianceConfig(BaseModel):
     enabled: bool = False
     pii_masking: bool = True
     pii_types: List[str] = Field(
-        default=["cpf", "cnpj", "phone", "bank_account", "credit_card", "email"],
+        default=["cpf", "cnpj", "phone", "bank_account", "credit_card", "email", "pix_key", "transaction_ref", "bank_account_full", "iban", "monetary_value"],
     )
     data_residency: bool = False
     allowed_regions: List[str] = Field(
@@ -169,6 +194,11 @@ class ComplianceConfig(BaseModel):
     )
     audit_retention_days: int = 1825  # 5 years per BACEN
     mask_direction: Literal["input", "output", "both"] = "both"
+
+
+# Per-tenant compliance configuration
+_tenant_configs: Dict[str, ComplianceConfig] = {}
+_global_config = ComplianceConfig()
 
 
 # Module-level mutable config (set at startup, read at runtime).
@@ -180,8 +210,35 @@ def get_active_config() -> ComplianceConfig:
 
 
 def set_active_config(cfg: ComplianceConfig) -> None:
-    global _active_config
+    global _active_config, _global_config
     _active_config = cfg
+    _global_config = cfg
+
+
+def get_config_for_tenant(tenant_id: str) -> ComplianceConfig:
+    """Get compliance config for a specific tenant. Falls back to global."""
+    try:
+        return _tenant_configs.get(tenant_id, _global_config)
+    except Exception:
+        verbose_proxy_logger.warning(
+            "compliance_latam: error retrieving tenant config for '%s', using global",
+            tenant_id,
+        )
+        return _global_config
+
+
+def set_config_for_tenant(tenant_id: str, config: ComplianceConfig) -> None:
+    """Set compliance config for a specific tenant/BU."""
+    try:
+        _tenant_configs[tenant_id] = config
+        verbose_proxy_logger.debug(
+            "compliance_latam: set tenant config for '%s'", tenant_id
+        )
+    except Exception:
+        verbose_proxy_logger.warning(
+            "compliance_latam: error setting tenant config for '%s'",
+            tenant_id,
+        )
 
 
 # ---------------------------------------------------------------------------
