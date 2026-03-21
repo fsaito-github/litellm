@@ -264,3 +264,38 @@ async def export_audit_logs(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=audit_logs.csv"},
     )
+
+
+@router.get(
+    "/audit/logs/{log_id}/verify",
+    tags=["audit"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+async def verify_audit_log_integrity(log_id: str):
+    """Verify the digital signature of an audit log entry for non-repudiation."""
+    from litellm.proxy.proxy_server import prisma_client
+    from litellm.proxy.hooks.audit_log_hook import verify_audit_signature
+
+    if prisma_client is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        rows = await prisma_client.db.query_raw(
+            'SELECT * FROM "LiteLLM_AuditLogTable" WHERE "id" = $1',
+            log_id,
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Audit log entry not found")
+
+        entry = rows[0]
+        is_valid = verify_audit_signature(entry)
+
+        return {
+            "log_id": log_id,
+            "signature_valid": is_valid,
+            "message": "Signature verified — entry has not been tampered with" if is_valid else "WARNING: Signature mismatch — entry may have been modified",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")

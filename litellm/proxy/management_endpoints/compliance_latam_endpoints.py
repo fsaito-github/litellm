@@ -12,7 +12,7 @@ Endpoints:
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
@@ -157,3 +157,82 @@ async def compliance_latam_report(
             "compliance_events": audit_log_compliance_events,
         },
     }
+
+
+@router.post(
+    "/compliance/latam/review-request",
+    tags=["compliance"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+async def request_automated_decision_review(
+    audit_log_id: str = Body(..., description="ID of the audit log entry to review"),
+    reason: str = Body(..., description="Reason for requesting review"),
+    requester_id: str = Body(..., description="ID of the person requesting review"),
+):
+    """
+    LGPD Art. 20 — Request human review of an automated decision.
+
+    Creates a review request linked to a specific audit log entry,
+    flagging it for human-in-the-loop review.
+    """
+    from litellm.proxy.hooks.audit_log_hook import fire_and_forget_audit_event
+
+    # Log the review request itself as an audit event
+    fire_and_forget_audit_event(
+        action="compliance.review_requested",
+        actor_id=requester_id,
+        actor_type="user",
+        resource_type="audit_log",
+        resource_id=audit_log_id,
+        details={
+            "reason": reason,
+            "lgpd_article": "Art. 20",
+            "status": "pending_review",
+        },
+        status="success",
+    )
+
+    return {
+        "status": "review_requested",
+        "audit_log_id": audit_log_id,
+        "message": "Review request registered. A human reviewer will analyze this automated decision.",
+        "lgpd_reference": "Lei 13.709/2018, Art. 20 — Direito de revisão de decisões automatizadas",
+    }
+
+
+@router.get(
+    "/compliance/latam/review-requests",
+    tags=["compliance"],
+    dependencies=[Depends(user_api_key_auth)],
+)
+async def list_review_requests(
+    status: Optional[str] = Query(default=None, description="Filter: pending_review, reviewed, dismissed"),
+    limit: int = Query(default=50, le=500),
+):
+    """List all LGPD Art. 20 review requests."""
+    from litellm.proxy.proxy_server import prisma_client
+
+    if prisma_client is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    conditions = ['"action" = $1']
+    params = ["compliance.review_requested"]
+    idx = 2
+
+    if status:
+        conditions.append(f'"details"::text LIKE ${idx}')
+        status_escaped = status.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        params.append(f"%{status_escaped}%")
+        idx += 1
+
+    where_clause = " AND ".join(conditions)
+
+    try:
+        rows = await prisma_client.db.query_raw(
+            f'SELECT * FROM "LiteLLM_AuditLogTable" WHERE {where_clause} ORDER BY "timestamp" DESC LIMIT {limit}',
+            *params,
+        )
+        return {"data": rows, "total": len(rows)}
+    except Exception as e:
+        verbose_proxy_logger.warning(f"Failed to list review requests: {e}")
+        raise HTTPException(status_code=500, detail="Failed to query review requests")

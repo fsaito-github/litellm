@@ -18,11 +18,54 @@ Usage:
 
 import asyncio
 import hashlib
+import hmac
 import json
+import os
 import traceback
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from litellm._logging import verbose_proxy_logger
+
+_AUDIT_SIGNING_KEY = os.getenv("LLMBRIDGE_AUDIT_SIGNING_KEY", "default-dev-key-change-in-production")
+
+
+def _sign_audit_entry(entry_data: Dict[str, Any]) -> str:
+    """Create HMAC-SHA256 signature for audit log non-repudiation."""
+    canonical = json.dumps(entry_data, sort_keys=True, default=str)
+    return hmac.new(
+        _AUDIT_SIGNING_KEY.encode(),
+        canonical.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_audit_signature(entry: Dict[str, Any]) -> bool:
+    """Verify the HMAC signature of an audit log entry."""
+    try:
+        details = entry.get("details") or {}
+        if isinstance(details, str):
+            details = json.loads(details)
+        stored_sig = details.get("signature")
+        if not stored_sig:
+            return False
+        signable = {
+            "action": entry.get("action"),
+            "actor_id": entry.get("actor_id"),
+            "resource_type": entry.get("resource_type"),
+            "resource_id": entry.get("resource_id"),
+            "timestamp": entry.get("timestamp"),
+            "request_hash": details.get("request_hash"),
+            "response_hash": details.get("response_hash"),
+        }
+        expected = _sign_audit_entry(signable)
+        return hmac.compare_digest(stored_sig, expected)
+    except Exception:
+        verbose_proxy_logger.warning(
+            "audit_log_hook: signature verification failed — %s",
+            traceback.format_exc(),
+        )
+        return False
 
 
 def _compute_hash(data: Any) -> str:
@@ -87,6 +130,25 @@ async def log_audit_event(
             enriched_details["latency_ms"] = latency_ms
         if tenant_id:
             enriched_details["tenant_id"] = tenant_id
+
+        # Compute digital signature for non-repudiation
+        timestamp_str = datetime.now(tz=timezone.utc).isoformat()
+        try:
+            signable = {
+                "action": action,
+                "actor_id": actor_id,
+                "resource_type": resource_type,
+                "resource_id": resource_id,
+                "timestamp": timestamp_str,
+                "request_hash": request_hash,
+                "response_hash": response_hash,
+            }
+            enriched_details["signature"] = _sign_audit_entry(signable)
+        except Exception:
+            verbose_proxy_logger.warning(
+                "audit_log_hook: failed to sign audit entry — %s",
+                traceback.format_exc(),
+            )
 
         await prisma_client.db.litellm_auditlogtable.create(
             data={
