@@ -18,6 +18,8 @@ Post-call:
   5. Observability Graph — record execution node
 """
 
+import hashlib
+import json as _json
 import os
 import time
 import traceback
@@ -225,6 +227,18 @@ class LLMBridgeCallbackHandler(CustomLogger):
 
         messages = data.get("messages", [])
 
+        # Extract tenant context from API key metadata
+        tenant_id = "default"
+        try:
+            if hasattr(user_api_key_dict, 'org_id') and user_api_key_dict.org_id:
+                tenant_id = user_api_key_dict.org_id
+            elif hasattr(user_api_key_dict, 'team_id') and user_api_key_dict.team_id:
+                tenant_id = user_api_key_dict.team_id
+        except Exception:
+            pass
+        data["metadata"] = data.get("metadata", {})
+        data["metadata"]["tenant_id"] = tenant_id
+
         # 1. Content Firewall ------------------------------------------------
         if self._firewall:
             try:
@@ -393,6 +407,43 @@ class LLMBridgeCallbackHandler(CustomLogger):
                     fire_and_forget_audit_event,
                 )
 
+                # Extract tenant_id from metadata
+                tenant_id = metadata.get("tenant_id", "default")
+
+                # Compute request/response hashes for audit integrity
+                messages = kwargs.get("messages", [])
+                request_hash = ""
+                try:
+                    request_hash = hashlib.sha256(
+                        _json.dumps(messages, sort_keys=True, default=str).encode()
+                    ).hexdigest()
+                except Exception:
+                    pass
+
+                response_hash = ""
+                try:
+                    response_text = str(response_obj)
+                    response_hash = hashlib.sha256(response_text.encode()).hexdigest()
+                except Exception:
+                    pass
+
+                # Extract usage and cost
+                usage = getattr(response_obj, "usage", None)
+                tokens_used = None
+                if usage:
+                    tokens_used = getattr(usage, "total_tokens", None)
+                cost = (
+                    getattr(response_obj, "_hidden_params", {}).get("response_cost")
+                    if response_obj
+                    else None
+                )
+
+                # Compute latency
+                pre_start = metadata.get("llmbridge_start_time")
+                latency_ms = None
+                if pre_start:
+                    latency_ms = (time.time() - pre_start) * 1000
+
                 fire_and_forget_audit_event(
                     action="llm.completion",
                     actor_id=metadata.get("user_api_key_user_id", "unknown"),
@@ -404,6 +455,13 @@ class LLMBridgeCallbackHandler(CustomLogger):
                         "cost_routed": metadata.get("cost_routed", False),
                         "original_model": metadata.get("original_model"),
                     },
+                    request_hash=request_hash,
+                    response_hash=response_hash,
+                    model_used=model,
+                    tokens_used=tokens_used,
+                    cost=cost,
+                    latency_ms=latency_ms,
+                    tenant_id=tenant_id,
                 )
             except Exception:
                 verbose_proxy_logger.error(
@@ -498,6 +556,23 @@ class LLMBridgeCallbackHandler(CustomLogger):
                     fire_and_forget_audit_event,
                 )
 
+                tenant_id = metadata.get("tenant_id", "default")
+
+                # Compute request hash for audit integrity
+                messages = kwargs.get("messages", [])
+                request_hash = ""
+                try:
+                    request_hash = hashlib.sha256(
+                        _json.dumps(messages, sort_keys=True, default=str).encode()
+                    ).hexdigest()
+                except Exception:
+                    pass
+
+                pre_start = metadata.get("llmbridge_start_time")
+                latency_ms = None
+                if pre_start:
+                    latency_ms = (time.time() - pre_start) * 1000
+
                 fire_and_forget_audit_event(
                     action="llm.completion",
                     actor_id=metadata.get("user_api_key_user_id", "unknown"),
@@ -510,6 +585,10 @@ class LLMBridgeCallbackHandler(CustomLogger):
                         "cost_routed": metadata.get("cost_routed", False),
                         "original_model": metadata.get("original_model"),
                     },
+                    request_hash=request_hash,
+                    model_used=model,
+                    latency_ms=latency_ms,
+                    tenant_id=tenant_id,
                 )
             except Exception:
                 verbose_proxy_logger.error(

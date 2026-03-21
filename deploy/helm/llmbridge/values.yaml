@@ -17,9 +17,21 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
-securityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # LiteLLM needs /tmp writes
+  runAsUser: 1000
+  runAsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
 
 service:
   type: ClusterIP
@@ -185,3 +197,7 @@ gunicorn:
 # -- Extra volumes and volume mounts
 extraVolumes: []
 extraVolumeMounts: []
+
+# -- Network policy for pod isolation
+networkPolicy:
+  enabled: true

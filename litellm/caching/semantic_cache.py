@@ -98,9 +98,6 @@ class SemanticCache(BaseCache):
         - A dedicated vector database (Qdrant, Pinecone, etc.)
     """
 
-    CACHE_PREFIX = "semantic_cache:entry:"
-    INDEX_KEY = "semantic_cache:index"
-
     def __init__(
         self,
         similarity_threshold: float = 0.90,
@@ -178,8 +175,15 @@ class SemanticCache(BaseCache):
         """Produce a deterministic short hash of text (used as part of the Redis key)."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
-    def _entry_key(self, text_hash: str) -> str:
-        return f"{self.CACHE_PREFIX}{text_hash}"
+    def _tenant_prefix(self, tenant_id: str = "default") -> str:
+        """Return a tenant-scoped key prefix to isolate cache data per tenant."""
+        return f"semantic_cache:{tenant_id}"
+
+    def _entry_key(self, text_hash: str, tenant_id: str = "default") -> str:
+        return f"{self._tenant_prefix(tenant_id)}:entry:{text_hash}"
+
+    def _index_key(self, tenant_id: str = "default") -> str:
+        return f"{self._tenant_prefix(tenant_id)}:index"
 
     async def _generate_embedding(self, text: str, **kwargs) -> List[float]:
         """
@@ -246,13 +250,14 @@ class SemanticCache(BaseCache):
     # ------------------------------------------------------------------
 
     async def get_semantic_match(
-        self, messages: List[Dict], **kwargs
+        self, messages: List[Dict], tenant_id: str = "default", **kwargs
     ) -> Optional[Dict]:
         """
         Search the cache for a semantically similar prompt.
 
         Args:
             messages: The chat messages to match against.
+            tenant_id: Tenant identifier for cache isolation.
 
         Returns:
             The cached response dict if similarity >= threshold, else ``None``.
@@ -267,8 +272,10 @@ class SemanticCache(BaseCache):
 
             query_embedding = await self._generate_embedding(text, **kwargs)
 
+            index_key = self._index_key(tenant_id)
+
             # Retrieve all entry keys from the index set
-            entry_keys = await self.redis_client.smembers(self.INDEX_KEY)
+            entry_keys = await self.redis_client.smembers(index_key)
             if not entry_keys:
                 self._cache_misses += 1
                 return None
@@ -358,6 +365,7 @@ class SemanticCache(BaseCache):
         messages: List[Dict],
         response: Dict,
         ttl: Optional[int] = None,
+        tenant_id: str = "default",
         **kwargs,
     ) -> None:
         """
@@ -367,6 +375,7 @@ class SemanticCache(BaseCache):
             messages: The chat messages (used to generate the embedding).
             response: The LLM response to cache.
             ttl: Optional TTL override (seconds). Defaults to ``self.default_ttl``.
+            tenant_id: Tenant identifier for cache isolation.
         """
         try:
             text = self._messages_to_text(messages)
@@ -375,7 +384,8 @@ class SemanticCache(BaseCache):
 
             embedding = await self._generate_embedding(text, **kwargs)
             text_hash = self._hash_text(text)
-            key = self._entry_key(text_hash)
+            key = self._entry_key(text_hash, tenant_id)
+            index_key = self._index_key(tenant_id)
             effective_ttl = ttl if ttl is not None else self.default_ttl
 
             entry = {
@@ -388,13 +398,13 @@ class SemanticCache(BaseCache):
 
             pipe = self.redis_client.pipeline(transaction=False)
             pipe.set(key, json.dumps(entry), ex=effective_ttl)
-            pipe.sadd(self.INDEX_KEY, key)
+            pipe.sadd(index_key, key)
             await pipe.execute()
 
             # Enforce max_cache_size by evicting oldest entries
-            current_size = await self.redis_client.scard(self.INDEX_KEY)
+            current_size = await self.redis_client.scard(index_key)
             if current_size > self.max_cache_size:
-                await self._evict_oldest(current_size - self.max_cache_size)
+                await self._evict_oldest(current_size - self.max_cache_size, tenant_id=tenant_id)
 
             verbose_proxy_logger.debug(
                 "SemanticCache STORE — key=%s, ttl=%d", key, effective_ttl
@@ -442,7 +452,8 @@ class SemanticCache(BaseCache):
             print_verbose("SemanticCache: no messages in async_get_cache kwargs")
             kwargs.setdefault("metadata", {})["semantic-similarity"] = 0.0
             return None
-        return await self.get_semantic_match(messages, **kwargs)
+        tenant_id = kwargs.get("metadata", {}).get("tenant_id", "default")
+        return await self.get_semantic_match(messages, tenant_id=tenant_id, **kwargs)
 
     async def async_set_cache(self, key: str, value: Any, **kwargs) -> None:
         """Store a response in the semantic cache."""
@@ -450,7 +461,8 @@ class SemanticCache(BaseCache):
         if not messages:
             print_verbose("SemanticCache: no messages in async_set_cache kwargs")
             return
-        await self.store_semantic_entry(messages, value, **kwargs)
+        tenant_id = kwargs.get("metadata", {}).get("tenant_id", "default")
+        await self.store_semantic_entry(messages, value, tenant_id=tenant_id, **kwargs)
 
     async def async_set_cache_pipeline(
         self, cache_list: List[Tuple[str, Any]], **kwargs
@@ -487,7 +499,9 @@ class SemanticCache(BaseCache):
 
             embedding = self._generate_embedding_sync(text)
             text_hash = self._hash_text(text)
-            redis_key = self._entry_key(text_hash)
+            tenant_id = kwargs.get("metadata", {}).get("tenant_id", "default") if kwargs else "default"
+            redis_key = self._entry_key(text_hash, tenant_id)
+            index_key = self._index_key(tenant_id)
             ttl = self.get_ttl(**kwargs) or self.default_ttl
 
             entry = {
@@ -503,7 +517,7 @@ class SemanticCache(BaseCache):
             async def _write():
                 pipe = self.redis_client.pipeline(transaction=False)
                 pipe.set(redis_key, json.dumps(entry), ex=ttl)
-                pipe.sadd(self.INDEX_KEY, redis_key)
+                pipe.sadd(index_key, redis_key)
                 await pipe.execute()
 
             try:
@@ -541,9 +555,12 @@ class SemanticCache(BaseCache):
 
             query_embedding = self._generate_embedding_sync(text)
 
+            tenant_id = kwargs.get("metadata", {}).get("tenant_id", "default") if kwargs else "default"
+            index_key = self._index_key(tenant_id)
+
             # Synchronous Redis read — run async code
             async def _read():
-                entry_keys = await self.redis_client.smembers(self.INDEX_KEY)
+                entry_keys = await self.redis_client.smembers(index_key)
                 if not entry_keys:
                     return None
 
@@ -620,7 +637,7 @@ class SemanticCache(BaseCache):
             except (ValueError, SyntaxError):
                 return cached_response
 
-    async def _evict_oldest(self, count: int) -> None:
+    async def _evict_oldest(self, count: int, tenant_id: str = "default") -> None:
         """
         Remove the *count* oldest entries from the cache.
 
@@ -630,7 +647,8 @@ class SemanticCache(BaseCache):
         import random
 
         try:
-            entry_keys = list(await self.redis_client.smembers(self.INDEX_KEY))
+            index_key = self._index_key(tenant_id)
+            entry_keys = list(await self.redis_client.smembers(index_key))
             if not entry_keys or count <= 0:
                 return
 
@@ -666,7 +684,7 @@ class SemanticCache(BaseCache):
                 pipe = self.redis_client.pipeline(transaction=False)
                 for k in keys_to_remove:
                     pipe.delete(k)
-                    pipe.srem(self.INDEX_KEY, k)
+                    pipe.srem(index_key, k)
                 await pipe.execute()
 
                 verbose_proxy_logger.debug(
